@@ -21,7 +21,7 @@ jobs:
 
       - name: ⬇️ 安装依赖
         run: |
-          pip install -r requirements.txt
+          pip install -r ArcticCloud-checkin/requirements.txt
 
       - name: 🚀 运行签到脚本
         env:
