@@ -2,25 +2,31 @@ name: ArcticCloud Checkin
 
 on:
   schedule:
-    - cron: "0 1 * * *" # 每天执行一次
-  workflow_dispatch:
+    - cron: "0 1 * * *"  # 每天 UTC+0 1:00 执行（北京时间早上9点）
+  workflow_dispatch:  # 允许手动触发
 
 jobs:
-  run:
+  checkin:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - name: Set up Python
+      - name: 拉取代码
+        uses: actions/checkout@v3
+
+      - name: 设置 Python
         uses: actions/setup-python@v4
         with:
-          python-version: '3.10'
-      - name: Install dependencies
+          python-version: 3.10
+
+      - name: 安装依赖
         run: |
-          pip install selenium webdriver-manager requests
-      - name: Run script
+          pip install -r requirements.txt
+
+      - name: 运行签到脚本
         env:
-          ARC_USER: ${{ secrets.ARC_USER }}
-          ARC_PASS: ${{ secrets.ARC_PASS }}
           TG_BOT_TOKEN: ${{ secrets.TG_BOT_TOKEN }}
           TG_CHAT_ID: ${{ secrets.TG_CHAT_ID }}
-        run: python arcticcloud.py
+          AC_USERNAME: ${{ secrets.AC_USERNAME }}
+          AC_PASSWORD: ${{ secrets.AC_PASSWORD }}
+          AC_URL: ${{ secrets.AC_URL }}
+        run: |
+          python arcticcloud.py
