@@ -1,42 +1,48 @@
+# 文件路径: .github/workflows/arcticcloud_renew.yml
 name: ArcticCloud VPS 自动续期
 
-on:
+于:
   schedule:
-    - cron: '0 12 * * *' # 每天中午12点运行
-  workflow_dispatch:
+    - cron: '0 12 * * *' # 每天中午12点 (UTC时间) 运行
+  workflow_dispatch: # 允许手动触发工作流
 
 jobs:
   renew_vps:
-    name: 执行 vps 续期
-    runs-on: ubuntu-latest
+    name: 执行 VPS 续期
+    runs-on: ubuntu-latest # 在最新的 Ubuntu 环境中运行
 
     steps:
       - name: 🛎️ 检出代码
-        uses: actions/checkout@v4
+        uses: actions/checkout@v4 # 使用 actions/checkout@v4 检出仓库代码
 
       - name: 🐍 设置 Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v5 # 使用 actions/setup-python@v5 设置 Python 环境
         with:
-          python-version: '3.11'
+          python-version: '3.11' # 指定 Python 版本为 3.11
 
       - name: ⬇️ 安装依赖
         run: |
-          pip install -r my_project/requirements.txt # <-- 修改这里，加上你的子目录名
-
+          pip install -r requirements.txt # <-- 已修正为直接引用根目录下的 requirements.txt
 
       - name: 🚀 运行签到脚本
         env:
+          # ArcticCloud 账号信息 (必须在 GitHub Secrets 中设置)
           ARCTIC_USERNAME: ${{ secrets.ARCTIC_USERNAME }}
           ARCTIC_PASSWORD: ${{ secrets.ARCTIC_PASSWORD }}
-          HEADLESS: ${{ secrets.HEADLESS || 'true' }}          # 可选：是否无头
-          ARCTIC_LOG_LEVEL: ${{ secrets.ARCTIC_LOG_LEVEL || 'INFO' }}
+          
+          # 脚本运行配置 (可在 GitHub Secrets 中设置，或使用默认值)
+          HEADLESS: ${{ secrets.HEADLESS || 'true' }}          # 是否无头模式运行浏览器 (默认为 true)
+          ARCTIC_LOG_LEVEL: ${{ secrets.ARCTIC_LOG_LEVEL || 'INFO' }} # 日志级别 (默认为 INFO)
+          
+          # 通知配置 (可选，根据需要设置，所有敏感信息都应在 GitHub Secrets 中设置)
           PUSH_PLUS_TOKEN: ${{ secrets.PUSH_PLUS_TOKEN }}
           PUSH_PLUS_USER: ${{ secrets.PUSH_PLUS_USER }}
           DD_BOT_SECRET: ${{ secrets.DD_BOT_SECRET }}
           DD_BOT_TOKEN: ${{ secrets.DD_BOT_TOKEN }}
           TG_BOT_TOKEN: ${{ secrets.TG_BOT_TOKEN }}
-          TG_USER_ID: ${{ secrets.TG_USER_ID }}
+          TG_USER_ID: ${{ secrets.TG_USER_ID }} # Telegram 个人用户ID (可选)
+          TG_CHAT_ID: ${{ secrets.TG_CHAT_ID }} # Telegram 群组ID (用于群组通知)
           WXPUSHER_APP_TOKEN: ${{ secrets.WXPUSHER_APP_TOKEN }}
           
         run: |
-          python arcticcloud.py
+          python arcticcloud.py # 执行主 Python 脚本
