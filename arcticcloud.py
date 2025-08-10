@@ -269,7 +269,7 @@ def renew_vps_instance(driver, instance_id):
         raise
 
 if __name__ == "__main__":
-    driver = None
+    driver = 无
     try:
         logging.info("🚀 开始执行VPS自动续费脚本...")
         driver = setup_driver()
