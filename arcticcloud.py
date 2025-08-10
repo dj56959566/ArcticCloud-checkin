@@ -4,84 +4,63 @@ import time
 import requests
 from selenium import webdriver
 from selenium.webdriver.chrome.service import Service
-from selenium.webdriver.common.by import By
-from selenium.webdriver.chrome.options import Options
 from webdriver_manager.chrome import ChromeDriverManager
+from selenium.webdriver.chrome.options import Options
 
-# ========== 配置区域 ==========
-ARC_USER = os.getenv("ARC_USER", "你的账号")
-ARC_PASS = os.getenv("ARC_PASS", "你的密码")
+# 读取环境变量
+TG_BOT_TOKEN = os.getenv("TG_BOT_TOKEN", "")
+TG_CHAT_ID = os.getenv("TG_CHAT_ID", "")
+AC_USERNAME = os.getenv("AC_USERNAME", "")
+AC_PASSWORD = os.getenv("AC_PASSWORD", "")
+AC_URL = os.getenv("AC_URL", "https://arcticcloud.example.com/login")
 
-# Telegram 推送
-TG_BOT_TOKEN = os.getenv("TG_BOT_TOKEN"， "你的TG机器人Token")
-TG_CHAT_ID = os.getenv("TG_CHAT_ID"， "-100xxxxxx")  # 群聊ID，负数开头
-
-# 截图目录（放当前路径，避免 /ql 权限问题）
-SCREENSHOT_DIR = os.path。join(os.getcwd(), "screenshots")
-os.makedirs(SCREENSHOT_DIR, exist_ok=True)
-
-# Arctic Cloud 登录地址
-ARC_LOGIN_URL = "https://arcticcloud.cn/auth/login"
-ARC_DASHBOARD_URL = "https://arcticcloud.cn/user"
-
-# ========== Telegram 发送函数 ==========
-def send_tg_message(text, photo_path=None):
-    """发送消息到 Telegram 群"""
+def send_telegram_message(message):
+    """推送到 Telegram 群"""
+    if not TG_BOT_TOKEN or not TG_CHAT_ID:
+        print("❌ 未设置 Telegram 推送信息")
+        return
     url = f"https://api.telegram.org/bot{TG_BOT_TOKEN}/sendMessage"
-    data = {"chat_id": TG_CHAT_ID, "text": text}
     try:
-        requests.post(url, data=data)
+        requests.post(url, data={
+            "chat_id": TG_CHAT_ID,
+            "text": message
+        })
+        print("✅ 已发送到 Telegram")
     except Exception as e:
-        print(f"发送文字失败: {e}")
+        print("❌ Telegram 推送失败：", e)
 
-    if photo_path and os.path.exists(photo_path):
-        url = f"https://api.telegram.org/bot{TG_BOT_TOKEN}/sendPhoto"
-        try:
-            with open(photo_path, "rb") as f:
-                files = {"photo": f}
-                data = {"chat_id": TG_CHAT_ID}
-                requests.post(url, data=data, files=files)
-        except Exception as e:
-            print(f"发送图片失败: {e}")
-
-# ========== 主执行流程 ==========
-def main():
-    # 配置浏览器
+def arcticcloud_checkin():
+    """ArcticCloud 自动签到"""
     chrome_options = Options()
-    chrome_options.add_argument("--headless=new")
+    chrome_options.add_argument("--headless")
     chrome_options.add_argument("--no-sandbox")
     chrome_options.add_argument("--disable-dev-shm-usage")
 
     driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=chrome_options)
+    driver.get(AC_URL)
+    time.sleep(2)
 
     try:
-        driver.get(ARC_LOGIN_URL)
-        time.sleep(2)
-
-        # 输入账号密码
-        driver.find_element(By.NAME, "email").send_keys(ARC_USER)
-        driver.find_element(By.NAME, "passwd").send_keys(ARC_PASS)
-
-        # 点击登录
-        driver.find_element(By.CSS_SELECTOR, "button[type='submit']").click()
-        time.sleep(5)
-
-        # 进入用户中心
-        driver.get(ARC_DASHBOARD_URL)
+        driver.find_element("name", "username").send_keys(AC_USERNAME)
+        driver.find_element("name", "password").send_keys(AC_PASSWORD)
+        driver.find_element("xpath", "//button[@type='submit']").click()
         time.sleep(3)
 
-        # 截图
-        screenshot_path = os.path.join(SCREENSHOT_DIR, f"arc_{int(time.time())}.png")
-        driver.save_screenshot(screenshot_path)
+        # 点击签到按钮（这里根据实际页面调整选择器）
+        driver.find_element("xpath", "//button[contains(text(),'签到')]").click()
+        time.sleep(2)
 
-        send_tg_message("✅ Arctic Cloud 签到成功", screenshot_path)
+        message = f"🌟 ArcticCloud 签到成功！账号：{AC_USERNAME}"
+        print(message)
+        send_telegram_message(message)
 
     except Exception as e:
-        error_msg = f"❌ Arctic Cloud 签到失败: {e}"
-        print(error_msg)
-        send_tg_message(error_msg)
+        message = f"❌ ArcticCloud 签到失败：{e}"
+        print(message)
+        send_telegram_message(message)
+
     finally:
         driver.quit()
 
 if __name__ == "__main__":
-    main()
+    arcticcloud_checkin()
