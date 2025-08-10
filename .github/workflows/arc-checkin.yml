@@ -1,0 +1,41 @@
+name: ArcticCloud VPS 自动续期
+
+on:
+  schedule:
+    - cron: '0 12 * * *' # 每天中午12点运行
+  workflow_dispatch:
+
+jobs:
+  renew_vps:
+    name: 执行 vps 续期
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 🛎️ 检出代码
+        uses: actions/checkout@v4
+
+      - name: 🐍 设置 Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: ⬇️ 安装依赖
+        run: |
+          pip install -r requirements.txt
+
+      - name: 🚀 运行签到脚本
+        env:
+          ARCTIC_USERNAME: ${{ secrets.ARCTIC_USERNAME }}
+          ARCTIC_PASSWORD: ${{ secrets.ARCTIC_PASSWORD }}
+          HEADLESS: ${{ secrets.HEADLESS || 'true' }}          # 可选：是否无头
+          ARCTIC_LOG_LEVEL: ${{ secrets.ARCTIC_LOG_LEVEL || 'INFO' }}
+          PUSH_PLUS_TOKEN: ${{ secrets.PUSH_PLUS_TOKEN }}
+          PUSH_PLUS_USER: ${{ secrets.PUSH_PLUS_USER }}
+          DD_BOT_SECRET: ${{ secrets.DD_BOT_SECRET }}
+          DD_BOT_TOKEN: ${{ secrets.DD_BOT_TOKEN }}
+          TG_BOT_TOKEN: ${{ secrets.TG_BOT_TOKEN }}
+          TG_USER_ID: ${{ secrets.TG_USER_ID }}
+          WXPUSHER_APP_TOKEN: ${{ secrets.WXPUSHER_APP_TOKEN }}
+          
+        run: |
+          python arcticcloud.py
