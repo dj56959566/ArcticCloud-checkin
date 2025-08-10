@@ -21,7 +21,8 @@ jobs:
 
       - name: ⬇️ 安装依赖
         run: |
-          pip install -r requirements.txt
+          pip install -r my_project/requirements.txt # <-- 修改这里，加上你的子目录名
+
 
       - name: 🚀 运行签到脚本
         env:
