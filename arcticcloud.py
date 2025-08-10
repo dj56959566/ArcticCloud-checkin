@@ -1,4 +1,3 @@
-# 文件路径: arcticcloud.py
 # -*- coding:utf-8 -*-
 # -------------------------------
 # @Author : github@wh1te3zzz https://github.com/wh1te3zzz/checkin
@@ -18,7 +17,7 @@ import os
 import time
 import logging
 import traceback
-from notify import send # 导入通知函数
+from notify import send
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
@@ -29,7 +28,7 @@ from selenium.common.exceptions import TimeoutException, NoSuchElementException
 
 # =================== 配置开关 ===================
 WAIT_TIMEOUT = 60         # 等待超时时间
-ENABLE_SCREENSHOT = False  # 是否开启截图功能 (在 GitHub Actions 中可能需要额外配置才能查看截图)
+ENABLE_SCREENSHOT = False  # 是否开启截图功能
 HEADLESS = os.environ.get("HEADLESS", "true").lower() == "true"  # 配置无头模式
 LOG_LEVEL = os.environ.get("ARCTIC_LOG_LEVEL", "INFO").upper()   # 配置日志级别
 # =================================================
@@ -42,8 +41,8 @@ PASSWORD = os.environ.get("ARCTIC_PASSWORD")
 LOGIN_URL = "https://vps.polarbear.nyc.mn/index/login/?referer="
 CONTROL_INDEX_URL = "https://vps.polarbear.nyc.mn/control/index/"
 
-# 截图目录 (在 GitHub Actions 中，建议使用 /tmp 目录)
-SCREENSHOT_DIR = "/tmp/screenshots"
+# 截图目录
+SCREENSHOT_DIR = "/ql/data/photo"
 os.makedirs(SCREENSHOT_DIR, exist_ok=True)
 
 # 设置日志输出等级
@@ -61,11 +60,8 @@ def take_screenshot(driver, filename="error.png"):
     if not ENABLE_SCREENSHOT:
         return
     path = os.path.join(SCREENSHOT_DIR, filename)
-    try:
-        driver.save_screenshot(path)
-        logging.debug("📸 已保存报错截图至: %s", path)
-    except Exception as e:
-        logging.warning(f"无法保存截图 {filename}: {e}")
+    driver.save_screenshot(path)
+    logging.debug("📸 已保存报错截图至: %s", path)
 
 def setup_driver():
     """初始化浏览器"""
@@ -82,7 +78,6 @@ def setup_driver():
     options.add_experimental_option("excludeSwitches", ["enable-automation"])
     options.add_experimental_option("useAutomationExtension", False)
 
-    # 在 GitHub Actions 中，chromedriver 通常在 /usr/bin/chromedriver
     service = Service(executable_path='/usr/bin/chromedriver')
     driver = webdriver.Chrome(service=service, options=options)
 
@@ -176,6 +171,9 @@ def find_and_navigate_to_instance_consoles(driver):
 
         logging.info(f"共获取到 {len(instance_ids)} 个实例")
 
+        # 保存当前首页的URL
+        control_index_url = driver.current_url
+
         for i in range(len(instance_ids)):
             instance_id = instance_ids[i]
             logging.info(f"正在处理实例 ID {instance_id} ({i + 1}/{len(instance_ids)})...")
@@ -191,12 +189,12 @@ def find_and_navigate_to_instance_consoles(driver):
                 logging.debug(f"✅ 已进入实例 ID {instance_id} 的控制台")
                 renew_vps_instance(driver, instance_id)
             except Exception as e:
-                logging.error(f"❌ 无法进入或处理实例 ID {instance_id} 的控制台: {e}")
+                logging.error(f"❌ 无法进入或处理实例 ID {instance_id} 的控制台")
                 take_screenshot(driver, f"instance_console_error_{instance_id}.png")
                 continue
 
     except Exception as e:
-        logging.error(f"❌ 无法找到或点击管理按钮: {e}")
+        logging.error(f"❌ 无法找到或点击管理按钮")
         take_screenshot(driver, "manage_button_click_error.png")
         raise
 
@@ -260,16 +258,16 @@ def renew_vps_instance(driver, instance_id):
                 take_screenshot(driver, "list_group_item_not_enough.png")
 
         except Exception as e:
-            logging.warning(f"⚠️ 读取列表项内容时发生异常：{e}")
+            logging.warning("⚠️ 读取列表项内容时发生异常：", e)
             take_screenshot(driver, "list_group_item_error.png")
 
     except Exception as e:
-        logging.error(f"❌ 续费过程中发生异常：{e}", exc_info=True)
+        logging.error("❌ 续费过程中发生异常：", exc_info=True)
         take_screenshot(driver, "renew_process_error.png")
         raise
 
 if __name__ == "__main__":
-    driver = 无
+    driver = None
     try:
         logging.info("🚀 开始执行VPS自动续费脚本...")
         driver = setup_driver()
@@ -280,8 +278,6 @@ if __name__ == "__main__":
 
     except Exception as e:
         logging.error("🔴 主程序运行异常，已终止。", exc_info=True)
-        # 在主程序异常时发送通知
-        send(title="ArcticCloud续期失败", content=f"脚本运行异常，请检查日志：{e}")
     finally:
         if driver:
             logging.info("关闭浏览器...")
