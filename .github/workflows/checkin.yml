@@ -1,0 +1,30 @@
+name: ArcticCloud 自动续期
+
+on:
+  schedule:
+    - cron: "0 1 * * *" # 每天 01:00 UTC（北京时间 9 点）执行
+  workflow_dispatch:
+
+jobs:
+  renew:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run ArcticCloud auto-renew
+        env:
+          ARCTIC_USERNAME: ${{ secrets.ARCTIC_USERNAME }}
+          ARCTIC_PASSWORD: ${{ secrets.ARCTIC_PASSWORD }}
+          TG_BOT_TOKEN: ${{ secrets.TG_BOT_TOKEN }}
+          TG_CHAT_ID: ${{ secrets.TG_CHAT_ID }}
+          HEADLESS: "true"
+          ARCTIC_LOG_LEVEL: "INFO"
+        run: python arcticcloud.py
