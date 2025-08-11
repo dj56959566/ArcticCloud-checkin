@@ -5,6 +5,7 @@ import time
 import logging
 import traceback
 import requests
+import re
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.chrome.options import Options
@@ -41,6 +42,10 @@ logging.basicConfig(
 )
 logging.getLogger().handlers[0].setFormatter(logging.Formatter(fmt="%(asctime)s - %(levelname)s - %(message)s"))
 
+def escape_markdown_v2(text):
+    escape_chars = r'_*[]()~`>#+-=|{}.!'
+    return re.sub(f'([{re.escape(escape_chars)}])', r'\\\1', text)
+
 def send_telegram(title, content):
     if not TG_BOT_TOKEN or not TG_CHAT_ID:
         logging.warning("Telegram 推送配置缺失，跳过发送。")
@@ -48,8 +53,8 @@ def send_telegram(title, content):
     url = f"https://api.telegram.org/bot{TG_BOT_TOKEN}/sendMessage"
     data = {
         "chat_id": TG_CHAT_ID,
-        "text": f"{title}\n{content}",
-        "parse_mode": "Markdown"
+        "text": content,
+        "parse_mode": "MarkdownV2"
     }
     try:
         resp = requests.post(url, data=data, timeout=15)
@@ -76,7 +81,7 @@ def setup_driver():
     options.add_argument("user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) " \
                          "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/138.0.0.0 Safari/537.36")
     if HEADLESS:
-        options.add_argument("--headless=new")  # 推荐使用新版headless模式
+        options.add_argument("--headless=new")  # 推荐新版headless模式
         options.add_argument("--disable-blink-features=AutomationControlled")
 
     options.add_experimental_option("excludeSwitches", ["enable-automation"])
@@ -135,6 +140,7 @@ def find_and_renew_instances(driver):
         logging.warning("没有找到任何实例")
         return
 
+    results = []
     for idx, btn in enumerate(manage_buttons, 1):
         href = btn.get_attribute("href")
         instance_id = href.split("/")[-2]
@@ -168,7 +174,6 @@ def find_and_renew_instances(driver):
                 logging.warning("未检测到续期成功提示，可能续期成功但页面无反馈")
                 take_screenshot(driver, f"success_alert_missing_{instance_id}.png")
 
-            # 读取续期到期时间
             list_group_items = WebDriverWait(driver, WAIT_TIMEOUT).until(
                 EC.presence_of_all_elements_located((By.XPATH, "//li[@class='list-group-item']"))
             )
@@ -179,13 +184,24 @@ def find_and_renew_instances(driver):
                     start = full_text.find("到期时间")
                     end = full_text.find("状态") if "状态" in full_text else len(full_text)
                     expiration_text = full_text[start:end].strip()
-            logging.info(f"实例 {instance_name} 续期成功，{expiration_text}")
 
-            send_telegram("ArcticCloud续期成功", f"实例 {instance_name} 续期成功，{expiration_text}")
+            # 拼接符合你需求的消息格式，做 MarkdownV2 转义
+            msg = (
+                f"📢 ArcticCloud续期成功【{instance_name}】\n"
+                "———————————————————\n"
+                "✅ 恭喜你签到成功\n"
+                f"🗓️ {expiration_text}"
+            )
+            results.append(escape_markdown_v2(msg))
 
         except Exception as e:
             logging.error(f"续期实例 {instance_name} 出错: {e}", exc_info=True)
             take_screenshot(driver, f"renew_error_{instance_id}.png")
+            err_msg = f"❌ ArcticCloud续期失败【{instance_name}】，错误: {e}"
+            results.append(escape_markdown_v2(err_msg))
+
+    if results:
+        send_telegram("", "\n\n".join(results))
 
 def main():
     driver = None
