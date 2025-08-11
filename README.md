@@ -1,6 +1,6 @@
-# ArcticCloud 自动续期脚本
+# ArcticCloud 自动续期脚本(现可以多个实例推送)
 
-支持 GitHub Actions 自动续期 ArcticCloud VPS，并推送续期状态到 Telegram bot/群。
+支持 GitHub Actions 自动续期 ArcticCloud VPS，并推送续期状态到 Telegram bot/群。现更新为每天早上九点
 
 ## 使用方法
 
