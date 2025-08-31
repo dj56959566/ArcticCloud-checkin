@@ -19,3 +19,5 @@
 ---
 
 脚本基于 Selenium + webdriver-manager，无需手动安装 ChromeDriver。
+原文
+https://github.com/wh1te3zzz/checkin
