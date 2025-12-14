@@ -27,7 +27,7 @@ ENABLE_SCREENSHOT = False
 
 # 页面地址
 LOGIN_URL = "https://vps.polarbear.nyc.mn/index/login/?referer="
-CONTROL_INDEX_URL = "https://vps.polarbear.nyc.mn/control/index/"
+CONTROL_INDEX_URL = "https://vps.polarbear.nyc.mn/control/index/detail/"
 
 # 截图目录
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
