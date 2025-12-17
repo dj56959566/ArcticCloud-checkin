@@ -23,18 +23,18 @@ TG_CHAT_ID = os.environ.get("TG_CHAT_ID")
 
 WAIT_TIMEOUT = 60
 HEADLESS = os.environ.get("HEADLESS", "true").lower() == "true"
-ENABLE_SCREENSHOT = False
+ENABLE_SCREENSHOT = False  # 如需调试可开启 True
 
 # 页面地址
 LOGIN_URL = "https://vps.polarbear.nyc.mn/index/login/?referer="
-CONTROL_INDEX_URL = "https://vps.polarbear.nyc.mn/control/index/detail/"
+CONTROL_INDEX_URL = "https://vps.polarbear.nyc.mn/control/index/"
 
 # 截图目录
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 SCREENSHOT_DIR = os.path.join(BASE_DIR, "screenshots")
 os.makedirs(SCREENSHOT_DIR, exist_ok=True)
 
-# 设置日志，支持中文和utf-8
+# 设置日志
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s - %(levelname)s - %(message)s",
@@ -78,10 +78,10 @@ def setup_driver():
     options.add_argument("--disable-dev-shm-usage")
     options.add_argument("--disable-gpu")
     options.add_argument("--window-size=1920,1080")
-    options.add_argument("user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) " \
-                         "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/138.0.0.0 Safari/537.36")
+    options.add_argument("user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/138.0.0.0 Safari/537.36")
+
     if HEADLESS:
-        options.add_argument("--headless=new")  # 推荐新版headless模式
+        options.add_argument("--headless=new")
         options.add_argument("--disable-blink-features=AutomationControlled")
 
     options.add_experimental_option("excludeSwitches", ["enable-automation"])
@@ -129,63 +129,81 @@ def navigate_to_control_index(driver):
     )
     logging.info("进入控制台首页")
 
+############################################################
+# 🆕 新增：等待实例列表渲染（解决你脚本报错的核心）
+############################################################
+def wait_for_instance_list(driver):
+    logging.info("等待实例列表加载...")
+
+    for i in range(30):  # 最多等 30 秒
+        # 查找所有管理按钮
+        btns = driver.find_elements(By.XPATH, "//a[contains(@href, '/control/detail/')]")
+        if btns:
+            logging.info(f"已找到 {len(btns)} 个实例")
+            return btns
+
+        # 滚动触发懒加载
+        driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
+        time.sleep(1)
+
+    raise TimeoutException("实例列表未加载成功（超过 30 秒仍无管理按钮）")
+
+############################################################
+
 def find_and_renew_instances(driver):
     logging.info("查找 VPS 实例列表...")
-    manage_buttons = WebDriverWait(driver, WAIT_TIMEOUT).until(
-        EC.presence_of_all_elements_located(
-            (By.XPATH, "//a[contains(@class,'btn btn-primary') and contains(@href,'/control/detail/')]")
-        )
-    )
-    if not manage_buttons:
-        logging.warning("没有找到任何实例")
-        return
+
+    manage_buttons = wait_for_instance_list(driver)
 
     results = []
     for idx, btn in enumerate(manage_buttons, 1):
         href = btn.get_attribute("href")
         instance_id = href.split("/")[-2]
         instance_name = btn.text.strip() or "未命名实例"
+
         logging.info(f"处理实例 {idx}/{len(manage_buttons)}: 名称={instance_name} ID={instance_id}")
 
+        # 进入实例详情页
         driver.get(f"https://vps.polarbear.nyc.mn/control/detail/{instance_id}/")
+
         WebDriverWait(driver, WAIT_TIMEOUT).until(
             EC.url_contains(f"/control/detail/{instance_id}/")
         )
 
         try:
+            # 点击续期按钮（弹窗按钮）
             renew_button = WebDriverWait(driver, WAIT_TIMEOUT).until(
                 EC.element_to_be_clickable((By.XPATH, "//button[@data-target='#addcontactmodal']"))
             )
             renew_button.click()
-            logging.info(f"点击续期按钮，实例：{instance_name}")
+            logging.info(f"点击续期按钮：{instance_name}")
 
-            submit_button = WebDriverWait(driver, 10).until(
+            # 点击确认
+            submit_button = WebDriverWait(driver, 15).until(
                 EC.element_to_be_clickable((By.CSS_SELECTOR, "input.btn.m-b-xs.w-xs.btn-success.install-complete"))
             )
             submit_button.click()
-            logging.info(f"点击确认续期按钮，实例：{instance_name}")
+            logging.info(f"确认续期：{instance_name}")
 
+            # 续期成功提示
             try:
-                success_alert = WebDriverWait(driver, 30).until(
+                success_alert = WebDriverWait(driver, 20).until(
                     EC.presence_of_element_located((By.XPATH, "//div[contains(@class,'alert-success')]"))
                 )
                 logging.info(f"续期成功，消息: {success_alert.text}")
             except TimeoutException:
-                logging.warning("未检测到续期成功提示，可能续期成功但页面无反馈")
-                take_screenshot(driver, f"success_alert_missing_{instance_id}.png")
+                logging.warning("无续期成功提示（可能页面无提示）")
+                take_screenshot(driver, f"no_alert_{instance_id}.png")
 
-            list_group_items = WebDriverWait(driver, WAIT_TIMEOUT).until(
-                EC.presence_of_all_elements_located((By.XPATH, "//li[@class='list-group-item']"))
-            )
-            expiration_text = "未找到到期时间信息"
-            if len(list_group_items) >= 5:
-                full_text = list_group_items[4].text.strip()
-                if "到期时间" in full_text:
-                    start = full_text.find("到期时间")
-                    end = full_text.find("状态") if "状态" in full_text else len(full_text)
-                    expiration_text = full_text[start:end].strip()
+            # 获取到期时间
+            list_group_items = driver.find_elements(By.XPATH, "//li[@class='list-group-item']")
+            expiration_text = "未找到到期时间"
 
-            # 拼接符合你需求的消息格式，做 MarkdownV2 转义
+            for item in list_group_items:
+                if "到期时间" in item.text:
+                    expiration_text = item.text.strip()
+                    break
+
             msg = (
                 f"📢 ArcticCloud续期成功【{instance_name}】\n"
                 "———————————————————\n"
@@ -195,11 +213,12 @@ def find_and_renew_instances(driver):
             results.append(escape_markdown_v2(msg))
 
         except Exception as e:
-            logging.error(f"续期实例 {instance_name} 出错: {e}", exc_info=True)
+            logging.error(f"续期出错：{instance_name} Error: {e}", exc_info=True)
             take_screenshot(driver, f"renew_error_{instance_id}.png")
             err_msg = f"❌ ArcticCloud续期失败【{instance_name}】，错误: {e}"
             results.append(escape_markdown_v2(err_msg))
 
+    # Telegram 推送结果
     if results:
         send_telegram("", "\n\n".join(results))
 
